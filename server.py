@@ -10,11 +10,10 @@ class MCPHandler(BaseHTTPRequestHandler):
     """HTTP server handler for SpaceX MCP (Model Context Protocol) implementation."""
     # Cached data - memory'de tutarak performans artırımı
     _cached_launch_data = None
-    _startup_checked = False
 
     @classmethod
     def _load_launch_data(cls):
-        """Launch data'yı memory'ye cache'le"""
+        """Launch data'yı memory'ye cache'le - lazy loading için sadece gerektiğinde çağrılır"""
         if cls._cached_launch_data is None:
             try:
                 with open('mcp_latest_launch.json', encoding='utf-8') as f:
@@ -27,13 +26,6 @@ class MCPHandler(BaseHTTPRequestHandler):
                 print(f"⚠ Warning: Error loading launch data: {e}")
                 cls._cached_launch_data = {"error": f"Data loading error: {str(e)}"}
         return cls._cached_launch_data
-
-    @classmethod
-    def startup_check(cls):
-        """Server startup sırasında bir kere kontrol et"""
-        if not cls._startup_checked:
-            cls._load_launch_data()
-            cls._startup_checked = True
 
     def _parse_config(self, query_string):
         """Smithery configuration'ını parse et"""
@@ -63,6 +55,9 @@ class MCPHandler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
         self.end_headers()
         self.wfile.write(json.dumps(payload).encode())
 
@@ -90,6 +85,7 @@ class MCPHandler(BaseHTTPRequestHandler):
             }
 
         elif method == 'tools/list':
+            # Lazy loading - sadece tool listesini döndür, veri yükleme yapma
             tools = [{
                 "name": "get_latest_launch",
                 "description": "SpaceX'in en son roket fırlatma bilgilerini alır",
@@ -156,9 +152,6 @@ class MCPHandler(BaseHTTPRequestHandler):
             self._send({"error": "Not found"}, 404)
             return
 
-        # Startup check
-        self.startup_check()
-
         # Configuration parse et
         config = {}
         if '?' in self.path:
@@ -199,13 +192,10 @@ class MCPHandler(BaseHTTPRequestHandler):
     def do_GET(self):  # pylint: disable=invalid-name
         """Handle GET requests for health check and MCP endpoints."""
         if self.path == '/health':
-            self.startup_check()
-            status = "healthy" if (self._cached_launch_data and
-                                 isinstance(self._cached_launch_data, dict) and
-                                 "error" not in self._cached_launch_data) else "degraded"  # pylint: disable=unsupported-membership-test
+            # Health check - lazy loading için veri yükleme yapmıyoruz
             self._send({
-                "status": status,
-                "server": "spacex-mcp",
+                "status": "healthy", 
+                "server": "spacex-mcp", 
                 "cached": self._cached_launch_data is not None
             })
         elif self.path.startswith('/mcp'):
@@ -233,10 +223,7 @@ if __name__ == '__main__':
     print(f"🚀 SpaceX MCP Server starting on port {port}...")
     print("📋 Supported methods: initialize, ping, tools/list, tools/call")
 
-    # Startup check
-    MCPHandler.startup_check()
-
     try:
         HTTPServer(('0.0.0.0', port), MCPHandler).serve_forever()
     except KeyboardInterrupt:
-        print("\n�� Server stopped")
+        print("\n Server stopped")
