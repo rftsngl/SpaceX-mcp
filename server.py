@@ -103,26 +103,6 @@ class MCPHandler(BaseHTTPRequestHandler):
                 "id": request_id
             }
 
-        elif method == 'tools/list':
-            # Smithery tool discovery için - authentication gerektirmez
-            return {
-                "jsonrpc": "2.0",
-                "result": {
-                    "tools": [
-                        {
-                            "name": "get_latest_launch",
-                            "description": "SpaceX'in en son roket fırlatma bilgilerini alır",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {},
-                                "required": []
-                            }
-                        }
-                    ]
-                },
-                "id": request_id
-            }
-
         elif method == 'tools/call':
             # Sadece tools/call'da veri yükleme yap
             return self._handle_tools_call(request_id, config)
@@ -144,12 +124,12 @@ class MCPHandler(BaseHTTPRequestHandler):
         """Handle tools/call method."""
         launch_data = self._load_launch_data()
 
-        if isinstance(launch_data, dict) and "error" in launch_data:
+        if isinstance(launch_data, dict) and "error" in launch_data:  # pylint: disable=unsupported-membership-test
             return {
                 "jsonrpc": "2.0",
                 "error": {
                     "code": -32000,
-                    "message": launch_data["error"]
+                    "message": launch_data["error"]  # pylint: disable=unsubscriptable-object
                 },
                 "id": request_id
             }
@@ -175,12 +155,6 @@ class MCPHandler(BaseHTTPRequestHandler):
             self._send({"error": "Not found"}, 404)
             return
 
-        # Configuration parse et
-        config = {}
-        parsed_url = urlparse(self.path)
-        if parsed_url.query:
-            config = self._parse_config(parsed_url.query)
-
         content_length = int(self.headers.get('Content-Length', 0))
         if content_length <= 0:
             self._send({"error": "No content"}, 400)
@@ -191,7 +165,35 @@ class MCPHandler(BaseHTTPRequestHandler):
             method = req.get('method')
             request_id = req.get('id')
 
-            print(f"📨 Received {method} request (ID: {request_id})")
+            # ULTRA HIZLI: tools/list için hiç config parse etme - Smithery timeout önleme
+            if method == 'tools/list':
+                self._send({
+                    "jsonrpc": "2.0",
+                    "result": {
+                        "tools": [
+                            {
+                                "name": "get_latest_launch",
+                                "description": "SpaceX'in en son roket fırlatma bilgilerini alır",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {},
+                                    "required": []
+                                }
+                            }
+                        ]
+                    },
+                    "id": request_id
+                })
+                return
+
+            # Configuration parse et - sadece tools/list dışında
+            config = {}
+            parsed_url = urlparse(self.path)
+            if parsed_url.query:
+                config = self._parse_config(parsed_url.query)
+
+            if method != 'tools/list':  # Smithery flood önleme
+                print(f"📨 Received {method} request (ID: {request_id})")
 
             resp = self._handle_mcp_method(method, request_id, config)
             if resp is not None:
