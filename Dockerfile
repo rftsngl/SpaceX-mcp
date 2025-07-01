@@ -8,6 +8,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Uygulamayı kopyala
 COPY . .
 
+# Gerekli data dosyalarını kopyala
+COPY mcp_latest_launch.json ./
+
 # Port expose et
 EXPOSE 8080
 

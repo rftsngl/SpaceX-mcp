@@ -4,7 +4,8 @@ build:
   dockerfile: "Dockerfile"
   dockerBuildPath: "."
 startCommand:
-  type: "http"
+  type: "mcp"
+  stdio: true
   env:
     PORT: "8080"
   configSchema:

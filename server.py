@@ -61,7 +61,7 @@ def mcp_endpoint():
         
         elif method == 'tools/call':
             try:
-                with open('mcp_latest_launch.json', 'r') as f:
+                with open('mcp_latest_launch.json', 'r', encoding='utf-8') as f:
                     launch_data = json.load(f)
                 return jsonify({
                     "jsonrpc": "2.0",
@@ -73,7 +73,7 @@ def mcp_endpoint():
                     },
                     "id": request_id
                 })
-            except:
+            except (FileNotFoundError, json.JSONDecodeError, OSError):
                 return jsonify({
                     "jsonrpc": "2.0",
                     "error": {
@@ -93,7 +93,7 @@ def mcp_endpoint():
             "id": request_id
         })
         
-    except:
+    except (KeyError, AttributeError, TypeError, ValueError):
         return jsonify({
             "jsonrpc": "2.0",
             "error": {
