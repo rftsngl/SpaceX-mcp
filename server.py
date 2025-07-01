@@ -186,7 +186,10 @@ class MCPHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):  # pylint: disable=invalid-name
         """Handle GET requests for health check and MCP endpoints."""
-        if self.path == '/health':
+        if self.path == '/':
+            # Root endpoint - basit response
+            self._send({"status": "ok", "server": "spacex-mcp"})
+        elif self.path == '/health':
             # Health check - lazy loading için veri yükleme yapmıyoruz
             self._send({
                 "status": "healthy", 
@@ -198,7 +201,7 @@ class MCPHandler(BaseHTTPRequestHandler):
             self._send({
                 "server": "spacex-mcp",
                 "version": "1.0.0",
-                "endpoints": ["/health", "/debug", "/mcp"],
+                "endpoints": ["/", "/health", "/debug", "/mcp"],
                 "methods": ["GET", "POST", "OPTIONS"],
                 "cached_data": self._cached_launch_data is not None
             })
@@ -225,18 +228,22 @@ class MCPHandler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
-    print(f"🚀 SpaceX MCP Server starting on port {port}...")
+    print(f"🚀 Starting SpaceX MCP Server on port {port}...")
     
     try:
         server = HTTPServer(('0.0.0.0', port), MCPHandler)
-        print(f"✅ Server bound to 0.0.0.0:{port}")
-        print("🔄 Starting server...")
+        print(f"✅ Server successfully bound to 0.0.0.0:{port}")
+        print("🌐 Server is ready to accept connections")
+        print("📋 Available endpoints:")
+        print("   - GET  /         - Root health check")
+        print("   - GET  /health   - Health status")
+        print("   - POST /mcp      - MCP protocol")
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n🛑 Server stopped")
+        print("\n🛑 Server stopped by user")
     except OSError as e:
         if e.errno == 48:
-            print(f"❌ Port {port} in use")
+            print(f"❌ Port {port} is already in use")
         else:
             print(f"❌ Server error: {e}")
         exit(1)
