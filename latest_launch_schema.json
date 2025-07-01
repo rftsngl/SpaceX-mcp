@@ -1,0 +1,408 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "fairings": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "reused": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "recovery_attempt": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "recovered": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "ships": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "recovered",
+              "recovery_attempt",
+              "reused",
+              "ships"
+            ]
+          }
+        ]
+      },
+      "links": {
+        "type": "object",
+        "properties": {
+          "patch": {
+            "type": "object",
+            "properties": {
+              "small": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "large": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "required": [
+              "large",
+              "small"
+            ]
+          },
+          "reddit": {
+            "type": "object",
+            "properties": {
+              "campaign": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "launch": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "media": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "recovery": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "required": [
+              "campaign",
+              "launch",
+              "media",
+              "recovery"
+            ]
+          },
+          "flickr": {
+            "type": "object",
+            "properties": {
+              "small": {
+                "type": "array"
+              },
+              "original": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "original",
+              "small"
+            ]
+          },
+          "presskit": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "webcast": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "youtube_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "article": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "wikipedia": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "article",
+          "flickr",
+          "patch",
+          "presskit",
+          "reddit",
+          "webcast",
+          "wikipedia",
+          "youtube_id"
+        ]
+      },
+      "static_fire_date_utc": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "static_fire_date_unix": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "net": {
+        "type": "boolean"
+      },
+      "window": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "rocket": {
+        "type": "string"
+      },
+      "success": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "failures": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "time": {
+              "type": "integer"
+            },
+            "altitude": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "altitude",
+            "reason",
+            "time"
+          ]
+        }
+      },
+      "details": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "crew": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "crew": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "crew",
+            "role"
+          ]
+        }
+      },
+      "ships": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "capsules": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "payloads": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "launchpad": {
+        "type": "string"
+      },
+      "flight_number": {
+        "type": "integer"
+      },
+      "name": {
+        "type": "string"
+      },
+      "date_utc": {
+        "type": "string"
+      },
+      "date_unix": {
+        "type": "integer"
+      },
+      "date_local": {
+        "type": "string"
+      },
+      "date_precision": {
+        "type": "string"
+      },
+      "upcoming": {
+        "type": "boolean"
+      },
+      "cores": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "core": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "flight": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "gridfins": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "legs": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "reused": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "landing_attempt": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "landing_success": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "landing_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "landpad": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "core",
+            "flight",
+            "gridfins",
+            "landing_attempt",
+            "landing_success",
+            "landing_type",
+            "landpad",
+            "legs",
+            "reused"
+          ]
+        }
+      },
+      "auto_update": {
+        "type": "boolean"
+      },
+      "tbd": {
+        "type": "boolean"
+      },
+      "launch_library_id": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "auto_update",
+      "capsules",
+      "cores",
+      "crew",
+      "date_local",
+      "date_precision",
+      "date_unix",
+      "date_utc",
+      "details",
+      "failures",
+      "fairings",
+      "flight_number",
+      "id",
+      "launch_library_id",
+      "launchpad",
+      "links",
+      "name",
+      "net",
+      "payloads",
+      "rocket",
+      "ships",
+      "static_fire_date_unix",
+      "static_fire_date_utc",
+      "success",
+      "tbd",
+      "upcoming",
+      "window"
+    ]
+  }
+}
