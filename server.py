@@ -45,8 +45,17 @@ class MCPHandler(BaseHTTPRequestHandler):
                             "id": request_id
                         }
                     
+                    elif method == 'ping':
+                        # Ping metodunu ekle - bağlantı testi için gerekli
+                        resp = {
+                            "jsonrpc": "2.0",
+                            "result": {},
+                            "id": request_id
+                        }
+                    
                     elif method == 'tools/list':
-                        # Tool listesi döndür (lazy loading)
+                        # Tool listesi döndür (lazy loading - authentication gerektirmez)
+                        # Kullanıcılar authentication olmadan araçları keşfedebilir
                         tools = [
                             {
                                 "name": "get_latest_launch",
@@ -68,13 +77,25 @@ class MCPHandler(BaseHTTPRequestHandler):
                     
                     elif method == 'tools/call':
                         # Tool çağrısını işle
+                        # Burada authentication kontrolü yapılabilir (sadece çağrı sırasında)
                         params = req.get('params', {})
                         tool_name = params.get('name')
                         
                         if tool_name == 'get_latest_launch':
                             try:
+                                # Configuration'dan API key kontrolü (isteğe bağlı)
+                                api_key = None
+                                for key, value in query_params.items():
+                                    if key == 'apiKey' and value:
+                                        api_key = value[0]
+                                
+                                # API key varsa kullan, yoksa da devam et (lazy loading prensibi)
+                                if api_key:
+                                    print(f"API Key kullanılıyor: {api_key[:10]}...")
+                                
                                 with open('mcp_latest_launch.json', encoding='utf-8') as f:
                                     result = json.load(f)
+                                
                                 resp = {
                                     "jsonrpc": "2.0",
                                     "result": {
@@ -96,6 +117,15 @@ class MCPHandler(BaseHTTPRequestHandler):
                                     },
                                     "id": request_id
                                 }
+                            except Exception as e:
+                                resp = {
+                                    "jsonrpc": "2.0",
+                                    "error": {
+                                        "code": -32000,
+                                        "message": f"Internal error: {str(e)}"
+                                    },
+                                    "id": request_id
+                                }
                         else:
                             resp = {
                                 "jsonrpc": "2.0",
@@ -105,6 +135,10 @@ class MCPHandler(BaseHTTPRequestHandler):
                                 },
                                 "id": request_id
                             }
+                    
+                    elif method == 'notifications/initialized':
+                        # Notification handling - response gerekmez
+                        return
                     
                     else:
                         resp = {
@@ -127,7 +161,17 @@ class MCPHandler(BaseHTTPRequestHandler):
                         },
                         "id": None
                     }
-                    self._send(resp)
+                    self._send(resp, 400)
+                except Exception as e:
+                    resp = {
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": -32603,
+                            "message": f"Internal error: {str(e)}"
+                        },
+                        "id": None
+                    }
+                    self._send(resp, 500)
             else:
                 self._send({"error": "No content"}, 400)
         else:
@@ -136,9 +180,12 @@ class MCPHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         # Health check için
         if self.path == '/health':
-            self._send({"status": "healthy"})
-        else:
+            self._send({"status": "healthy", "server": "spacex-mcp"})
+        elif self.path.startswith('/mcp'):
+            # MCP için sadece POST desteklenir
             self._send({"error": "Use POST for MCP protocol"}, 405)
+        else:
+            self._send({"error": "Not found"}, 404)
 
     def do_DELETE(self):
         if self.path.startswith('/mcp'):
@@ -147,10 +194,15 @@ class MCPHandler(BaseHTTPRequestHandler):
             self._send({"error": "Not found"}, 404)
 
     def do_OPTIONS(self):
-        self._send({})
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
 
 if __name__ == '__main__':
     # PORT environment variable'ını kullan
     port = int(os.environ.get('PORT', 8080))
-    print(f"MCP Server {port} portunda başlatılıyor...")
+    print(f"SpaceX MCP Server {port} portunda başlatılıyor...")
+    print("Desteklenen metodlar: initialize, ping, tools/list, tools/call")
     HTTPServer(('0.0.0.0', port), MCPHandler).serve_forever()
