@@ -4,7 +4,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
 import base64
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 
 class MCPHandler(BaseHTTPRequestHandler):
     """HTTP server handler for SpaceX MCP (Model Context Protocol) implementation."""
@@ -28,28 +28,41 @@ class MCPHandler(BaseHTTPRequestHandler):
         return cls._cached_launch_data
 
     def _parse_config(self, query_string):
-        """Smithery configuration'ını parse et"""
+        """Smithery configuration'ını parse et - geliştirilmiş versiyon"""
         config = {}
-        if query_string:
-            params = parse_qs(query_string)
+        if not query_string:
+            return config
 
-            # Base64 encoded config parametresi
+        try:
+            params = parse_qs(query_string)
+            
+            # Base64 encoded config parametresi (Smithery'nin ana yöntemi)
             if 'config' in params and params['config']:
                 try:
                     encoded_config = params['config'][0]
+                    # URL-safe base64 decode
+                    encoded_config = encoded_config.replace('-', '+').replace('_', '/')
+                    # Padding ekle
+                    while len(encoded_config) % 4:
+                        encoded_config += '='
                     decoded_bytes = base64.b64decode(encoded_config)
                     config = json.loads(decoded_bytes.decode('utf-8'))
+                    print(f"✓ Config parsed from base64: {list(config.keys())}")
                 except (base64.binascii.Error, json.JSONDecodeError, UnicodeDecodeError) as e:
-                    print(f"Config parse error: {e}")
+                    print(f"⚠ Config base64 parse error: {e}")
 
-            # Direct query parameters (dot-notation için)
+            # Direct query parameters (dot-notation için fallback)
             for key, values in params.items():
                 if key != 'config' and values:
                     config[key] = values[0]
 
+        except Exception as e:
+            print(f"⚠ Config parse error: {e}")
+
         return config
 
     def _send(self, payload, status=200):
+        """Response gönder - geliştirilmiş CORS ve headers"""
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -62,7 +75,10 @@ class MCPHandler(BaseHTTPRequestHandler):
         self.send_header('Connection', 'close')
         self.send_header('X-Response-Time', '0ms')
         self.end_headers()
-        self.wfile.write(json.dumps(payload, ensure_ascii=False, separators=(',', ':')).encode('utf-8'))
+        
+        if payload is not None:
+            response_json = json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
+            self.wfile.write(response_json.encode('utf-8'))
 
     def _handle_mcp_method(self, method, request_id, config):
         """Handle different MCP protocol methods."""
@@ -87,6 +103,26 @@ class MCPHandler(BaseHTTPRequestHandler):
                 "id": request_id
             }
 
+        elif method == 'tools/list':
+            # Smithery tool discovery için - authentication gerektirmez
+            return {
+                "jsonrpc": "2.0",
+                "result": {
+                    "tools": [
+                        {
+                            "name": "get_latest_launch",
+                            "description": "SpaceX'in en son roket fırlatma bilgilerini alır",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {},
+                                "required": []
+                            }
+                        }
+                    ]
+                },
+                "id": request_id
+            }
+
         elif method == 'tools/call':
             # Sadece tools/call'da veri yükleme yap
             return self._handle_tools_call(request_id, config)
@@ -108,12 +144,12 @@ class MCPHandler(BaseHTTPRequestHandler):
         """Handle tools/call method."""
         launch_data = self._load_launch_data()
 
-        if isinstance(launch_data, dict) and "error" in launch_data:  # pylint: disable=unsupported-membership-test
+        if isinstance(launch_data, dict) and "error" in launch_data:
             return {
                 "jsonrpc": "2.0",
                 "error": {
                     "code": -32000,
-                    "message": launch_data["error"]  # pylint: disable=unsubscriptable-object
+                    "message": launch_data["error"]
                 },
                 "id": request_id
             }
@@ -133,17 +169,17 @@ class MCPHandler(BaseHTTPRequestHandler):
             "id": request_id
         }
 
-    def do_POST(self):  # pylint: disable=invalid-name
+    def do_POST(self):
         """Handle POST requests for MCP protocol endpoints."""
         if not self.path.startswith('/mcp'):
             self._send({"error": "Not found"}, 404)
             return
 
-        # Configuration parse et - hızlı parse
+        # Configuration parse et
         config = {}
-        if '?' in self.path:
-            query_string = self.path.split('?', 1)[1]
-            config = self._parse_config(query_string)
+        parsed_url = urlparse(self.path)
+        if parsed_url.query:
+            config = self._parse_config(parsed_url.query)
 
         content_length = int(self.headers.get('Content-Length', 0))
         if content_length <= 0:
@@ -155,15 +191,7 @@ class MCPHandler(BaseHTTPRequestHandler):
             method = req.get('method')
             request_id = req.get('id')
 
-            # Smithery için ultra hızlı response - tools/list için hiç log yapma
-            if method == 'tools/list':
-                # Anında response döndür
-                self._send({
-                    "jsonrpc": "2.0",
-                    "result": {"tools": [{"name": "get_latest_launch", "description": "SpaceX'in en son roket fırlatma bilgilerini alır", "inputSchema": {"type": "object", "properties": {}, "required": []}}]},
-                    "id": request_id
-                })
-                return
+            print(f"📨 Received {method} request (ID: {request_id})")
 
             resp = self._handle_mcp_method(method, request_id, config)
             if resp is not None:
@@ -184,7 +212,7 @@ class MCPHandler(BaseHTTPRequestHandler):
                 "id": None
             }, 500)
 
-    def do_GET(self):  # pylint: disable=invalid-name
+    def do_GET(self):
         """Handle GET requests for health check and MCP endpoints."""
         if self.path == '/':
             # Root endpoint - basit response
@@ -206,18 +234,19 @@ class MCPHandler(BaseHTTPRequestHandler):
                 "cached_data": self._cached_launch_data is not None
             })
         elif self.path.startswith('/mcp'):
-            self._send({"error": "Use POST for MCP protocol"}, 405)
+            # MCP endpoint için GET request - Smithery compatibility
+            self._send({"message": "MCP endpoint - use POST for protocol requests"}, 405)
         else:
             self._send({"error": "Not found"}, 404)
 
-    def do_DELETE(self):  # pylint: disable=invalid-name
+    def do_DELETE(self):
         """Handle DELETE requests for MCP endpoints."""
         if self.path.startswith('/mcp'):
             self._send({"message": "DELETE supported"})
         else:
             self._send({"error": "Not found"}, 404)
 
-    def do_OPTIONS(self):  # pylint: disable=invalid-name
+    def do_OPTIONS(self):
         """Handle OPTIONS requests for CORS preflight."""
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
