@@ -1,8 +1,18 @@
 name: spacex-mcp
+runtime: "container"
 build:
-  docker:
-    context: .
-    dockerfile: Dockerfile
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
 run:
   command: ["python","server.py"]
   port: 8080
+startCommand:
+  type: "http"
+  configSchema:
+    type: "object"
+    properties:
+      apiKey:
+        type: "string"
+        description: "API anahtarınız (isteğe bağlı)"
+  exampleConfig:
+    apiKey: "example-key"
