@@ -60,8 +60,9 @@ class MCPHandler(BaseHTTPRequestHandler):
         self.send_header('Pragma', 'no-cache')
         self.send_header('Expires', '0')
         self.send_header('Connection', 'close')
+        self.send_header('X-Response-Time', '0ms')
         self.end_headers()
-        self.wfile.write(json.dumps(payload, ensure_ascii=False).encode('utf-8'))
+        self.wfile.write(json.dumps(payload, ensure_ascii=False, separators=(',', ':')).encode('utf-8'))
 
     def _handle_mcp_method(self, method, request_id, config):
         """Handle different MCP protocol methods."""
@@ -83,25 +84,6 @@ class MCPHandler(BaseHTTPRequestHandler):
             return {
                 "jsonrpc": "2.0",
                 "result": {},
-                "id": request_id
-            }
-
-        elif method == 'tools/list':
-            # Smithery lazy loading - hiçbir I/O işlemi yapma, sadece tool listesini döndür
-            # Bu metod çok hızlı response vermeli
-            return {
-                "jsonrpc": "2.0",
-                "result": {
-                    "tools": [{
-                        "name": "get_latest_launch",
-                        "description": "SpaceX'in en son roket fırlatma bilgilerini alır",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {},
-                            "required": []
-                        }
-                    }]
-                },
                 "id": request_id
             }
 
@@ -173,9 +155,15 @@ class MCPHandler(BaseHTTPRequestHandler):
             method = req.get('method')
             request_id = req.get('id')
 
-            # Smithery için hızlı response - sadece tools/list ve initialize için log
-            if method in ['tools/list', 'initialize']:
-                print(f"⚡ Fast response for: {method}")
+            # Smithery için ultra hızlı response - tools/list için hiç log yapma
+            if method == 'tools/list':
+                # Anında response döndür
+                self._send({
+                    "jsonrpc": "2.0",
+                    "result": {"tools": [{"name": "get_latest_launch", "description": "SpaceX'in en son roket fırlatma bilgilerini alır", "inputSchema": {"type": "object", "properties": {}, "required": []}}]},
+                    "id": request_id
+                })
+                return
 
             resp = self._handle_mcp_method(method, request_id, config)
             if resp is not None:
