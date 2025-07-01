@@ -2,4 +2,10 @@ venv/
 __pycache__/
 .git/
 *.pyc
-*.json      # isterseniz build bağlamına dahil etmek istemediğiniz çıktı dosyaları
+*.json
+
+latest_launch.json
+latest_launch_schema.json
+fetch_latest.py
+convert_to_mcp.py
+infer_schema.py
