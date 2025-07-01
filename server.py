@@ -56,7 +56,7 @@ class MCPHandler(BaseHTTPRequestHandler):
                 if key != 'config' and values:
                     config[key] = values[0]
 
-        except Exception as e:
+        except (ValueError, TypeError, UnicodeDecodeError) as e:
             print(f"⚠ Config parse error: {e}")
 
         return config
