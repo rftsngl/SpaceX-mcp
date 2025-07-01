@@ -1,0 +1,5 @@
+venv/
+__pycache__/
+.git/
+*.pyc
+*.json      # isterseniz build bağlamına dahil etmek istemediğiniz çıktı dosyaları
