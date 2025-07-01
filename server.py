@@ -54,7 +54,8 @@ class MCPHandler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+        self.send_header('Access-Control-Max-Age', '86400')
         self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         self.send_header('Pragma', 'no-cache')
         self.send_header('Expires', '0')
@@ -204,6 +205,15 @@ class MCPHandler(BaseHTTPRequestHandler):
                 "server": "spacex-mcp", 
                 "cached": self._cached_launch_data is not None
             })
+        elif self.path == '/debug':
+            # Debug endpoint for troubleshooting
+            self._send({
+                "server": "spacex-mcp",
+                "version": "1.0.0",
+                "endpoints": ["/health", "/debug", "/mcp"],
+                "methods": ["GET", "POST", "OPTIONS"],
+                "cached_data": self._cached_launch_data is not None
+            })
         elif self.path.startswith('/mcp'):
             self._send({"error": "Use POST for MCP protocol"}, 405)
         else:
@@ -221,15 +231,34 @@ class MCPHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+        self.send_header('Access-Control-Max-Age', '86400')
         self.end_headers()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     print(f"🚀 SpaceX MCP Server starting on port {port}...")
     print("📋 Supported methods: initialize, ping, tools/list, tools/call")
+    print(f"🌐 Server will be available at: http://0.0.0.0:{port}")
+    print("✅ Ready to accept connections...")
 
     try:
-        HTTPServer(('0.0.0.0', port), MCPHandler).serve_forever()
+        server = HTTPServer(('0.0.0.0', port), MCPHandler)
+        print(f"✅ Server successfully bound to port {port}")
+        print("🔗 Available endpoints:")
+        print("   - GET  /health  - Health check")
+        print("   - GET  /debug   - Debug info")
+        print("   - POST /mcp     - MCP protocol")
+        print("   - OPTIONS /mcp  - CORS preflight")
+        server.serve_forever()
     except KeyboardInterrupt:
-        print("\n Server stopped")
+        print("\n🛑 Server stopped by user")
+    except OSError as e:
+        if e.errno == 48:  # Address already in use
+            print(f"❌ Port {port} is already in use. Please use a different port.")
+        else:
+            print(f"❌ Server failed to start: {e}")
+        exit(1)
+    except ValueError as e:
+        print(f"❌ Server failed to start: {e}")
+        exit(1)
