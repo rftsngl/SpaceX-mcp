@@ -29,7 +29,7 @@ class MCPHandler(BaseHTTPRequestHandler):
         return cls._cached_launch_data
 
     @classmethod
-    def _startup_check(cls):
+    def startup_check(cls):
         """Server startup sırasında bir kere kontrol et"""
         if not cls._startup_checked:
             cls._load_launch_data()
@@ -157,7 +157,7 @@ class MCPHandler(BaseHTTPRequestHandler):
             return
 
         # Startup check
-        self._startup_check()
+        self.startup_check()
 
         # Configuration parse et
         config = {}
@@ -199,7 +199,7 @@ class MCPHandler(BaseHTTPRequestHandler):
     def do_GET(self):  # pylint: disable=invalid-name
         """Handle GET requests for health check and MCP endpoints."""
         if self.path == '/health':
-            self._startup_check()
+            self.startup_check()
             status = "healthy" if (self._cached_launch_data and
                                  isinstance(self._cached_launch_data, dict) and
                                  "error" not in self._cached_launch_data) else "degraded"  # pylint: disable=unsupported-membership-test
@@ -234,7 +234,7 @@ if __name__ == '__main__':
     print("📋 Supported methods: initialize, ping, tools/list, tools/call")
 
     # Startup check
-    MCPHandler._startup_check()
+    MCPHandler.startup_check()
 
     try:
         HTTPServer(('0.0.0.0', port), MCPHandler).serve_forever()
