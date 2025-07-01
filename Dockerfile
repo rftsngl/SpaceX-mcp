@@ -18,5 +18,5 @@ COPY . .
 # Port expose et
 EXPOSE 8080
 
-# Sunucuyu başlat
-CMD ["python", "server.py"]
+# Gunicorn ile production server başlat
+CMD ["gunicorn", "-b", "0.0.0.0:8080", "-w", "1", "--timeout", "30", "server:app"]
