@@ -1,0 +1,8 @@
+name: spacex-mcp
+build:
+  docker:
+    context: .
+    dockerfile: Dockerfile
+run:
+  command: ["python","server.py"]
+  port: 8080
