@@ -1,13 +1,14 @@
 FROM python:3.13-slim
 WORKDIR /app
 
-# Güvenlik ve kullanıcı oluşturma
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && adduser --disabled-password --gecos '' app \
-    && chown -R app:app /app
+# Sadece gerekli paketleri kur ve temizle
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
+# Kullanıcı oluştur
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /app
 
 USER app
 COPY requirements.txt ./
