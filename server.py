@@ -51,15 +51,16 @@ class MCPHandler(BaseHTTPRequestHandler):
 
     def _send(self, payload, status=200):
         self.send_response(status)
-        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         self.send_header('Pragma', 'no-cache')
         self.send_header('Expires', '0')
+        self.send_header('Connection', 'close')
         self.end_headers()
-        self.wfile.write(json.dumps(payload).encode())
+        self.wfile.write(json.dumps(payload, ensure_ascii=False).encode('utf-8'))
 
     def _handle_mcp_method(self, method, request_id, config):
         """Handle different MCP protocol methods."""
@@ -85,23 +86,26 @@ class MCPHandler(BaseHTTPRequestHandler):
             }
 
         elif method == 'tools/list':
-            # Lazy loading - sadece tool listesini döndür, veri yükleme yapma
-            tools = [{
-                "name": "get_latest_launch",
-                "description": "SpaceX'in en son roket fırlatma bilgilerini alır",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
-            }]
+            # Smithery lazy loading - hiçbir I/O işlemi yapma, sadece tool listesini döndür
+            # Bu metod çok hızlı response vermeli
             return {
                 "jsonrpc": "2.0",
-                "result": {"tools": tools},
+                "result": {
+                    "tools": [{
+                        "name": "get_latest_launch",
+                        "description": "SpaceX'in en son roket fırlatma bilgilerini alır",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    }]
+                },
                 "id": request_id
             }
 
         elif method == 'tools/call':
+            # Sadece tools/call'da veri yükleme yap
             return self._handle_tools_call(request_id, config)
 
         elif method == 'notifications/initialized':
@@ -152,7 +156,7 @@ class MCPHandler(BaseHTTPRequestHandler):
             self._send({"error": "Not found"}, 404)
             return
 
-        # Configuration parse et
+        # Configuration parse et - hızlı parse
         config = {}
         if '?' in self.path:
             query_string = self.path.split('?', 1)[1]
@@ -168,7 +172,9 @@ class MCPHandler(BaseHTTPRequestHandler):
             method = req.get('method')
             request_id = req.get('id')
 
-            print(f"📝 Method: {method}, Config: {config}")
+            # Smithery için hızlı response - sadece tools/list ve initialize için log
+            if method in ['tools/list', 'initialize']:
+                print(f"⚡ Fast response for: {method}")
 
             resp = self._handle_mcp_method(method, request_id, config)
             if resp is not None:
