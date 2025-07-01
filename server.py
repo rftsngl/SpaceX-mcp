@@ -226,27 +226,20 @@ class MCPHandler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     print(f"🚀 SpaceX MCP Server starting on port {port}...")
-    print("📋 Supported methods: initialize, ping, tools/list, tools/call")
-    print(f"🌐 Server will be available at: http://0.0.0.0:{port}")
-    print("✅ Ready to accept connections...")
-
+    
     try:
         server = HTTPServer(('0.0.0.0', port), MCPHandler)
-        print(f"✅ Server successfully bound to port {port}")
-        print("🔗 Available endpoints:")
-        print("   - GET  /health  - Health check")
-        print("   - GET  /debug   - Debug info")
-        print("   - POST /mcp     - MCP protocol")
-        print("   - OPTIONS /mcp  - CORS preflight")
+        print(f"✅ Server bound to 0.0.0.0:{port}")
+        print("🔄 Starting server...")
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n🛑 Server stopped by user")
+        print("\n🛑 Server stopped")
     except OSError as e:
-        if e.errno == 48:  # Address already in use
-            print(f"❌ Port {port} is already in use. Please use a different port.")
+        if e.errno == 48:
+            print(f"❌ Port {port} in use")
         else:
-            print(f"❌ Server failed to start: {e}")
+            print(f"❌ Server error: {e}")
         exit(1)
     except ValueError as e:
-        print(f"❌ Server failed to start: {e}")
+        print(f"❌ Configuration error: {e}")
         exit(1)
