@@ -5,6 +5,8 @@ build:
   dockerBuildPath: "."
 startCommand:
   type: "http"
+  env:
+    PORT: "8080"
   configSchema:
     type: "object"
     properties:
