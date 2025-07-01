@@ -1,8 +1,14 @@
-FROM python:3.13-alpine
+FROM python:3.13-slim
 WORKDIR /app
-RUN apk add --no-cache --virtual .build-deps gcc musl-dev \
-    && adduser -D app \
+
+# Güvenlik ve kullanıcı oluşturma
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && adduser --disabled-password --gecos '' app \
     && chown -R app:app /app
+
 USER app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
