@@ -6,8 +6,6 @@ build:
 startCommand:
   type: "mcp"
   stdio: true
-  env:
-    PORT: "8080"
   configSchema:
     type: "object"
     properties:

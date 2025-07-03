@@ -11,9 +11,5 @@ COPY . .
 # Gerekli data dosyalarını kopyala
 COPY mcp_latest_launch.json ./
 
-# Port expose et
-EXPOSE 8080
-
-# Flask'ı direkt çalıştır
-ENV PORT=8080
+# MCP server'ı STDIO üzerinden çalıştır
 CMD ["python", "server.py"]

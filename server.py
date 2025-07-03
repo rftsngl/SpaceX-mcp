@@ -1,45 +1,58 @@
-"""SpaceX MCP (Model Context Protocol) server implementation."""
+"""SpaceX MCP Server - Model Context Protocol implementasyonu."""
 
-from flask import Flask, request, jsonify
+import asyncio
 import json
-import os
+import sys
+from typing import Any, Dict
+from app import spacex_api, format_launch_data
 
-app = Flask(__name__)
-
-# Disable Flask logging
-import logging
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
-
-@app.route('/mcp', methods=['POST'])
-def mcp_endpoint():
-    """Handle MCP protocol requests."""
-    try:
-        data = request.get_json()
-        method = data.get('method')
-        request_id = data.get('id')
-        
-        # KRITIK: tools/list ANINDA dön
-        if method == 'tools/list':
-            return jsonify({
-                "jsonrpc": "2.0",
-                "result": {
-                    "tools": [{
-                        "name": "get_latest_launch",
-                        "description": "SpaceX'in en son roket fırlatma bilgilerini alır",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {},
-                            "required": []
+class SpaceXMCPServer:
+    """SpaceX MCP Server sınıfı."""
+    
+    def __init__(self):
+        self.tools = [
+            {
+                "name": "get_latest_launch",
+                "description": "SpaceX'in en son roket fırlatma bilgilerini alır",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            },
+            {
+                "name": "get_upcoming_launches", 
+                "description": "SpaceX'in yaklaşan fırlatmalarını alır",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "integer",
+                            "description": "Kaç fırlatma bilgisi çekilecek (varsayılan: 5)",
+                            "default": 5
                         }
-                    }]
-                },
-                "id": request_id
-            })
+                    },
+                    "required": []
+                }
+            },
+            {
+                "name": "get_company_info",
+                "description": "SpaceX şirket bilgilerini alır", 
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            }
+        ]
+    
+    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """MCP request'lerini işler."""
+        method = request.get("method")
+        request_id = request.get("id")
         
-        # Diğer method'lar
-        if method == 'initialize':
-            return jsonify({
+        if method == "initialize":
+            return {
                 "jsonrpc": "2.0",
                 "result": {
                     "protocolVersion": "2024-11-05",
@@ -50,70 +63,147 @@ def mcp_endpoint():
                     }
                 },
                 "id": request_id
-            })
+            }
         
-        elif method == 'ping':
-            return jsonify({
-                "jsonrpc": "2.0",
-                "result": {},
+        elif method == "tools/list":
+            return {
+                "jsonrpc": "2.0", 
+                "result": {"tools": self.tools},
                 "id": request_id
-            })
+            }
         
-        elif method == 'tools/call':
-            try:
-                with open('mcp_latest_launch.json', 'r', encoding='utf-8') as f:
-                    launch_data = json.load(f)
-                return jsonify({
-                    "jsonrpc": "2.0",
-                    "result": {
-                        "content": [{
-                            "type": "text",
-                            "text": json.dumps(launch_data, indent=2)
-                        }]
-                    },
-                    "id": request_id
-                })
-            except (FileNotFoundError, json.JSONDecodeError, OSError):
-                return jsonify({
+        elif method == "tools/call":
+            params = request.get("params", {})
+            tool_name = params.get("name")
+            tool_args = params.get("arguments", {})
+            
+            if tool_name == "get_latest_launch":
+                data = spacex_api.get_latest_launch()
+                if data:
+                    formatted_text = format_launch_data(data)
+                    return {
+                        "jsonrpc": "2.0",
+                        "result": {
+                            "content": [{
+                                "type": "text",
+                                "text": formatted_text
+                            }]
+                        },
+                        "id": request_id
+                    }
+                else:
+                    return {
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": -32000,
+                            "message": "En son fırlatma verisi alınamadı"
+                        },
+                        "id": request_id
+                    }
+            
+            elif tool_name == "get_upcoming_launches":
+                limit = tool_args.get("limit", 5)
+                data = spacex_api.get_upcoming_launches(limit)
+                if data:
+                    return {
+                        "jsonrpc": "2.0",
+                        "result": {
+                            "content": [{
+                                "type": "text", 
+                                "text": json.dumps(data, indent=2, ensure_ascii=False)
+                            }]
+                        },
+                        "id": request_id
+                    }
+                else:
+                    return {
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": -32000,
+                            "message": "Yaklaşan fırlatma verileri alınamadı"
+                        },
+                        "id": request_id
+                    }
+            
+            elif tool_name == "get_company_info":
+                data = spacex_api.get_company_info()
+                if data:
+                    return {
+                        "jsonrpc": "2.0",
+                        "result": {
+                            "content": [{
+                                "type": "text",
+                                "text": json.dumps(data, indent=2, ensure_ascii=False)
+                            }]
+                        },
+                        "id": request_id
+                    }
+                else:
+                    return {
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": -32000,
+                            "message": "Şirket bilgileri alınamadı"
+                        },
+                        "id": request_id
+                    }
+            
+            else:
+                return {
                     "jsonrpc": "2.0",
                     "error": {
-                        "code": -32000,
-                        "message": "Data not available"
+                        "code": -32601,
+                        "message": f"Bilinmeyen tool: {tool_name}"
                     },
                     "id": request_id
-                })
+                }
         
-        # Method not found
-        return jsonify({
-            "jsonrpc": "2.0",
-            "error": {
-                "code": -32601,
-                "message": f"Method not found: {method}"
-            },
-            "id": request_id
-        })
-        
-    except (KeyError, AttributeError, TypeError, ValueError):
-        return jsonify({
-            "jsonrpc": "2.0",
-            "error": {
-                "code": -32603,
-                "message": "Internal error"
-            },
-            "id": None
-        }), 500
+        else:
+            return {
+                "jsonrpc": "2.0",
+                "error": {
+                    "code": -32601,
+                    "message": f"Bilinmeyen method: {method}"
+                },
+                "id": request_id
+            }
 
-@app.route('/')
-def health():
-    """Health check endpoint."""
-    return jsonify({"status": "ok"})
+async def main():
+    """Ana server fonksiyonu."""
+    server = SpaceXMCPServer()
+    
+    # STDIO üzerinden MCP protokolü
+    while True:
+        try:
+            line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
+            if not line:
+                break
+            
+            request = json.loads(line.strip())
+            response = await server.handle_request(request)
+            
+            print(json.dumps(response), flush=True)
+            
+        except (json.JSONDecodeError, KeyError) as e:
+            error_response = {
+                "jsonrpc": "2.0",
+                "error": {
+                    "code": -32700,
+                    "message": f"Parse error: {e}"
+                },
+                "id": None
+            }
+            print(json.dumps(error_response), flush=True)
+        except Exception as e:
+            error_response = {
+                "jsonrpc": "2.0", 
+                "error": {
+                    "code": -32603,
+                    "message": f"Internal error: {e}"
+                },
+                "id": None
+            }
+            print(json.dumps(error_response), flush=True)
 
-@app.route('/health')
-def health_check():
-    """Health check endpoint."""
-    return jsonify({"status": "healthy"})
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    # Production mode için
-    app.run(host='0.0.0.0', port=port, debug=False)
+if __name__ == "__main__":
+    asyncio.run(main())
