@@ -1,10 +1,16 @@
+#!/usr/bin/env python3
 """SpaceX MCP Server - Model Context Protocol implementasyonu."""
 
-import asyncio
 import json
 import sys
-from typing import Any, Dict
+import logging
+from typing import Any, Dict, List, Optional
+
+# Import our SpaceX API
 from app import spacex_api, format_launch_data
+
+# Disable logging to avoid interfering with MCP protocol
+logging.basicConfig(level=logging.CRITICAL)
 
 class SpaceXMCPServer:
     """SpaceX MCP Server sınıfı."""
@@ -46,37 +52,41 @@ class SpaceXMCPServer:
             }
         ]
     
-    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """MCP request'lerini işler."""
-        method = request.get("method")
+    def handle_initialize(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Initialize request'ini işler."""
+        return {
+            "jsonrpc": "2.0",
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "tools": {}
+                },
+                "serverInfo": {
+                    "name": "spacex-mcp",
+                    "version": "1.0.0"
+                }
+            },
+            "id": request.get("id")
+        }
+    
+    def handle_tools_list(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Tools/list request'ini işler."""
+        return {
+            "jsonrpc": "2.0",
+            "result": {
+                "tools": self.tools
+            },
+            "id": request.get("id")
+        }
+    
+    def handle_tools_call(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Tools/call request'ini işler."""
+        params = request.get("params", {})
+        tool_name = params.get("name")
+        tool_args = params.get("arguments", {})
         request_id = request.get("id")
         
-        if method == "initialize":
-            return {
-                "jsonrpc": "2.0",
-                "result": {
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": {"tools": {}},
-                    "serverInfo": {
-                        "name": "spacex-mcp",
-                        "version": "1.0.0"
-                    }
-                },
-                "id": request_id
-            }
-        
-        elif method == "tools/list":
-            return {
-                "jsonrpc": "2.0", 
-                "result": {"tools": self.tools},
-                "id": request_id
-            }
-        
-        elif method == "tools/call":
-            params = request.get("params", {})
-            tool_name = params.get("name")
-            tool_args = params.get("arguments", {})
-            
+        try:
             if tool_name == "get_latest_launch":
                 data = spacex_api.get_latest_launch()
                 if data:
@@ -157,7 +167,30 @@ class SpaceXMCPServer:
                     },
                     "id": request_id
                 }
+                
+        except Exception as e:
+            return {
+                "jsonrpc": "2.0",
+                "error": {
+                    "code": -32603,
+                    "message": f"Tool execution error: {str(e)}"
+                },
+                "id": request_id
+            }
+    
+    def handle_request(self, request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """MCP request'lerini yönlendirir."""
+        method = request.get("method")
         
+        if method == "initialize":
+            return self.handle_initialize(request)
+        elif method == "initialized":
+            # initialized notification - response gönderme
+            return None
+        elif method == "tools/list":
+            return self.handle_tools_list(request)
+        elif method == "tools/call":
+            return self.handle_tools_call(request)
         else:
             return {
                 "jsonrpc": "2.0",
@@ -165,45 +198,61 @@ class SpaceXMCPServer:
                     "code": -32601,
                     "message": f"Bilinmeyen method: {method}"
                 },
-                "id": request_id
+                "id": request.get("id")
             }
-
-async def main():
-    """Ana server fonksiyonu."""
-    server = SpaceXMCPServer()
     
-    # STDIO üzerinden MCP protokolü
-    while True:
+    def send_response(self, response: Dict[str, Any]) -> None:
+        """Response'u STDOUT'a yazar."""
+        json.dump(response, sys.stdout, ensure_ascii=False)
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+    
+    def run(self) -> None:
+        """Ana server loop'u."""
         try:
-            line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
-            if not line:
-                break
-            
-            request = json.loads(line.strip())
-            response = await server.handle_request(request)
-            
-            print(json.dumps(response), flush=True)
-            
-        except (json.JSONDecodeError, KeyError) as e:
-            error_response = {
-                "jsonrpc": "2.0",
-                "error": {
-                    "code": -32700,
-                    "message": f"Parse error: {e}"
-                },
-                "id": None
-            }
-            print(json.dumps(error_response), flush=True)
-        except Exception as e:
-            error_response = {
-                "jsonrpc": "2.0", 
-                "error": {
-                    "code": -32603,
-                    "message": f"Internal error: {e}"
-                },
-                "id": None
-            }
-            print(json.dumps(error_response), flush=True)
+            for line in sys.stdin:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                try:
+                    request = json.loads(line)
+                    response = self.handle_request(request)
+                    
+                    if response is not None:
+                        self.send_response(response)
+                        
+                except json.JSONDecodeError as e:
+                    error_response = {
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": -32700,
+                            "message": f"Parse error: {str(e)}"
+                        },
+                        "id": None
+                    }
+                    self.send_response(error_response)
+                    
+                except Exception as e:
+                    error_response = {
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": -32603,
+                            "message": f"Internal error: {str(e)}"
+                        },
+                        "id": None
+                    }
+                    self.send_response(error_response)
+                    
+        except KeyboardInterrupt:
+            pass
+        except EOFError:
+            pass
+
+def main():
+    """Ana fonksiyon."""
+    server = SpaceXMCPServer()
+    server.run()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
